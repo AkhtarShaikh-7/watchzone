@@ -13,14 +13,16 @@ const registerUser = asyncHandler(async (req, res) => {
     // create user object - create entry in db
     // remove password and refresh token field from response
     // check fro user creation
-    // return response
+    // return response 
 
-    const { username, email, fullname, password } = req.body
-    console.log("email:", email);
+    const { username, email, fullName, password } = req.body
+    // console.log("email:", email);
+    console.log("console kiya req.body",req.body);
+    
 
     // we are checking here if it is empty or not validation
     if (
-        [username, email, fullname, password].some((field) => field?.trim() === "")
+        [username, email, fullName, password].some((field) => field?.trim() === "")
     ) {
         throw new ApiError(400, "All field are required");
 
@@ -28,7 +30,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // here we are checking in database which user making id here it is existed or not if exist throw erro (user existed);
     // help of USer model who gives use permission directlt into db
     // findOne is a method in which we get operators lik or , and
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [{ username }, { email }] //in [] we can take any num of fields to check exoted or not
     });
 
@@ -36,10 +38,18 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "User with email or username already existed ")
     }
 
+    console.log("log req.files",req.files);
+    
     // ?????
     // multer gives acces of files which we can taken by frontend
     const avatarLocalPath = req.files?.avatar[0]?.path
-    const coverImageLocalPath = req.files?.coverImage[0]?.path
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path
+
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length >0){
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
+
     // chcek ones console log ???
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar files is required");;
@@ -49,6 +59,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // upload on cloudinary
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    
 
     if(!avatar){
         throw new ApiError(400,"Avatar file is required");
@@ -57,7 +68,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // save all information in database using "User"??
    const user = await User.create({
-        fullname,
+        fullName, 
         avatar: avatar.url,
         coverImage:coverImage?.url || "", // it is not required and we didnt chekced we have or not that's why we checked here if its then ok other " "
         email,
@@ -80,7 +91,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // return res.status(201).json({createdUser});
 
     // we have alraedy defind class that how we can send our response in structured way just make object using {new}keyword??
-    return res.status(2001).json(
+    return res.status(201).json(
         new ApiResponse(200, createdUser, "user registerd successfully")
     )
 

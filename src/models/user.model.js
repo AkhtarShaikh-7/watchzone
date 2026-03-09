@@ -54,10 +54,10 @@ const userSchema = new Schema(
 );
 // this is called plugin just data sAVE krne se pahle kuch kaam karo (methods avaliable hai : save , delete).save krne se pahle paswprd hash kro
 userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) return next();
+    if (!this.isModified("password")) return ;
 
     this.password = await bcrypt.hash(this.password, 10);
-    next();
+    // next();    // in monggose v7+ version me built in hai so dotn use it caises error
 })
 // creating custom methods just checking password is correct or not
 userSchema.methods.isPasswordCorrect = async function (password) {
