@@ -4,6 +4,29 @@ import { User } from '../models/user.model.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
+
+// creating method to gives token we gives again and gain so we r creating method
+const generateAccessAndRefreshTokens = async (userId) => {
+    try {
+        // function me userID joo melega usse ham db se user ka infomation le lenge and user me save krdenge
+        const user = await User.findById(userId);
+        const accesstoken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+        // hamne dono tokens ko generate kr liye
+
+        // now abb refershtoken ko add krna hai db me qki hamrepass object aagya hai yha par user name se so usem add krdo
+        user.refreshToken - refreshToken
+        await user.save({ validateBeforeSave: false }) //we get this method in mongoose matlab password mat check kro direct save krdo db me refersh token ko
+
+        // kaam hone ke baad user ko bhi dena hai dono token so return krdo
+        return { accesstoken, refreshToken };
+
+    } catch (error) {
+        throw new ApiError(500, "something went wrong while generating refresh and access token");
+    }
+}
+
+
 const registerUser = asyncHandler(async (req, res) => {
     // get user details from frintend
     // validation - not empty
@@ -17,8 +40,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const { username, email, fullName, password } = req.body
     // console.log("email:", email);
-    console.log("console kiya req.body",req.body);
-    
+    // console.log("console kiya req.body",req.body);
+
 
     // we are checking here if it is empty or not validation
     if (
@@ -38,15 +61,15 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "User with email or username already existed ")
     }
 
-    console.log("log req.files",req.files);
-    
+    // console.log("log req.files",req.files);
+
     // ?????
     // multer gives acces of files which we can taken by frontend
     const avatarLocalPath = req.files?.avatar[0]?.path
     // const coverImageLocalPath = req.files?.coverImage[0]?.path
 
     let coverImageLocalPath;
-    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length >0){
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path
     }
 
@@ -59,21 +82,21 @@ const registerUser = asyncHandler(async (req, res) => {
     // upload on cloudinary
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-    
 
-    if(!avatar){
-        throw new ApiError(400,"Avatar file is required");
-        
+
+    if (!avatar) {
+        throw new ApiError(400, "Avatar file is required");
+
     }
 
     // save all information in database using "User"??
-   const user = await User.create({
-        fullName, 
+    const user = await User.create({
+        fullName,
         avatar: avatar.url,
-        coverImage:coverImage?.url || "", // it is not required and we didnt chekced we have or not that's why we checked here if its then ok other " "
+        coverImage: coverImage?.url || "", // it is not required and we didnt chekced we have or not that's why we checked here if its then ok other " "
         email,
         password,
-        username:username.toLowerCase(),
+        username: username.toLowerCase(),
 
     });
     // we are caaling again in db to check with _id means user craeted or  not it null??
@@ -83,8 +106,8 @@ const registerUser = asyncHandler(async (req, res) => {
     );
 
     // check user ctrreated or not if not mistake our means server??
-    if(!createdUser){
-        throw new ApiError(500,"something went wrong while registering the user");
+    if (!createdUser) {
+        throw new ApiError(500, "something went wrong while registering the user");
     }
 
     // we are retuning user from database after created in db successfully
@@ -95,6 +118,95 @@ const registerUser = asyncHandler(async (req, res) => {
         new ApiResponse(200, createdUser, "user registerd successfully")
     )
 
+});
+
+const loginUser = asyncHandler(async (req, res) => {
+    // req.body - data
+    // usernamer or email
+    // find the user
+    //password check
+    // access and refresh token
+    // send cookie
+
+    const { username, email, password } = req.body;
+
+    if (!username || !email) {
+        throw new ApiError(400, "username or password is required");
+    }
+
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // now check password
+    // take user joo return hua hai db se na ki schema wala USer 
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid user credentials")
+    }
+
+    // if password correct hai tu login dedo means refreshtoken and accesstoken dedo 
+    // abb iske liye hmane methods bna diye hai so call kro aur lelo
+    const { accesstoken, refreshToken } = await generateAccessAndRefreshTokens(user._id) // method ko call kiya and user ke throw _id pass kr diye and return me mujhe tokens mil rhe hai use var me sav krlo
+    // yha par joo user hai usme joo token key hai woo empty hai so phirse db call krn padega??
+    // qki tokejns to hamne line number 155 pe set kiya hai methods ko call krke islye?
+
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")  // {select} me woo type kro joo db se nhi chiye
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .cookie("accessToken", accesstoken, options) //token key:value and options kuch hai 
+        .cookie("refreshToken", refreshToken, options)
+        //return me json bhej rhe hai uske sath joobhi details send krni hoo in objects send krdo
+        .json(
+            new ApiResponse(
+                200, {
+                user: loggedInUser, accesstoken, refreshToken
+            },
+                "User logged in successfully"
+            )
+        )
+});
+
+
+
+// logout user
+const logoutUser = asyncHandler(async (req, res) => {
+    //    iske routes se mujhe mil rha hai req.body middleware se
+    // req.user._id
+    await User.findByIdAndUpdate(
+        req.user._id, {
+        //set to set anything in db
+        $set: {
+            refreshToken: undefined
+        }
+    },
+        //aur bhi kaam kr skte hai iske sath me
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly:true,
+        secure:true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken",options)
+    .json(new ApiResponse(200,{},"User Logged Out"));
 })
 
-export { registerUser };
+export { registerUser, loginUser, logoutUser };
