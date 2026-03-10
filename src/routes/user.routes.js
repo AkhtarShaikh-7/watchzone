@@ -1,6 +1,7 @@
 import {Router} from 'express'
-import { registerUser } from '../controllers/user.controller.js';
+import { loginUser, logoutUser, registerUser } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
+import { verifyJWT } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -18,5 +19,11 @@ router.route("/register").post(
     // ye controller logic user details wala
     registerUser
 );
+
+router.route("/login").post(loginUser)
+
+
+// secured routes using middleware using {auth.middleware.js}
+router.route("/logout").post(verifyJWT,logoutUser) //verifyJWT iske last me next() ye bolta hai min done abb next kaam kro jbhi hai like (logoutuser)
 
 export default router;
