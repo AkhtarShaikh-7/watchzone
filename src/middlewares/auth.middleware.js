@@ -2,9 +2,9 @@
 // ye bss check krega user hai ya nhi hai
 // ** middleware me 4 options atte hai {error,req, res,next} next kaam hogya middleware ka abb aage ka kaam tum dekh loo
 
-import { User } from "../models/user.model";
-import { ApiError } from "../utils/ApiError";
-import { asyncHandler } from "../utils/asyncHandler";
+import { User } from "../models/user.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
 
